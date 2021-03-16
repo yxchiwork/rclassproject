@@ -1,0 +1,171 @@
+---
+title: "Group C Project"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  word_document:
+    toc: yes
+  html_document:
+    author: "Yuxiang Chi, Raj Kumar, Chandrark Thaker, Richa Patel"
+    theme: flatly
+    toc: yes
+    toc_float: yes
+    code_download: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, cache = F}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  error = TRUE,
+  warning= FALSE,
+  message= FALSE)
+```
+
+```{r, include=FALSE}
+# load libs 
+packages <- c("tidyverse", "dplyr", "lubridate")
+install.packages(setdiff(packages, rownames(installed.packages())))  
+library(tidyverse)
+library(lubridate)
+# Import data
+
+US_accidents <- read_csv("data/US_accidents.csv", 
+    col_types = cols(Start_Time = col_datetime(format = "%m/%d/%Y %H:%M"), 
+        End_Time = col_datetime(format = "%m/%d/%Y %H:%M"), 
+        Weather_Timestamp = col_datetime(format = "%m/%d/%Y %H:%M")))
+
+```
+
+## Group Information
+Group Name: Group C
+Group Members: 
+Chandrark Thaker
+Raj Kumar
+Richa Patel
+Yuxiang Chi
+
+## Dataset description
+This is a countrywide car accident dataset, which covers 49 states of the USA. The accident data are collected from February 2016 to Dec 2020, there are about 4.2 million accident records in this dataset.
+We are using this dataset to analyze the accidents happened in US and what factors are impacting it.
+
+### **TO-DO** Use some charts to make it more visually appealing
+- explore the variables inside your data (know your data is a critical step in any
+analytical project and present it to your audiance)
+- manipulating your data (creating new variables of interest or adding variables of
+interest from other datasets).
+- Make sure that your report has a title page (group name, authors name, date), an
+introduction section, a body section (the core of the analysis) and a conclusions section.
+All these sections are required. I also expect to receive a coherent report easy to follow
+and read (with captions and cross-references).
+
+
+## Column description
+| Column Name    | Description |
+| ----------- | ----------- |
+| ID | Unique IDs |
+| Severity | Shows the severity of the accident |
+| Start_Time | starts a time of the accident in the local time zone. |
+| End_Time	| end time of the accident in local time zone.|
+| Distance | The length of the road extent affected by the accident. |
+| Description | gives the information about the accident.|
+| Street | shows the street name in the address record. |
+| City | shows the city name in the address record. |
+| County	| shows the county name in the address record.
+| State	| shows the state name in the address record. |
+| Zipcode	| shows the zip code in the address record. |
+| Timezone | shows the time zone depending on the accident location (eastern, central, pacific, etc.) |
+| Weather_Timestamp | Shows the time-stamp of the weather | observation record (in local time). |
+| Temperature | Shows the temperature (in Fahrenheit). |
+| Wind_Chill | Shows the wind chill (in Fahrenheit). |
+| Humidity  | Shows the humidity (in percentage). |
+| Pressure | Shows the air pressure (in inches). |
+| Visibility | Shows visibility (in miles). |
+| Wind_Direction | Shows wind direction.(sw: south-west, ssw:  south-south-west, wsw: west-south-west, etc.) |
+| Wind_Speed  |Shows wind speed (in miles per hour). |
+| Weather_Condition | Shows the weather condition (rain, snow, thunderstorm, fog, etc.) |
+| Bump  | shows the accident happen location nearby the speed bump.	|
+| Crossing 	|shows the accident happen location nearby the crossing area. |
+| Precipitation | This column is about the precipitation for the raining.|
+| Junction  |shows the accident happen location nearby the junction. |	
+| No_Exit	|shows the accident happen location nearby the highway exit.	|
+| Traffic_Signal	| shows the accident happen location nearby the traffic signal.	|
+| Sunrise_Sunset  | Shows the period of day (i.e. day or night) based on sunrise/sunset. | 
+
+## Introduction:
+Since the invention of cars, we have car accidents every second in the worldwide. In this study, we will focus on the car accidents data in US from 2016 to 2020. 
+First, i would like to understand if the accident is more likely to happen in weekdays or weekends. so create a new column day of week based on accident start time and count the accident by day of week. we plot the number of accident by day of week in a bar chart and it shows daily accidents in weekdays is almost tripped than weekends.
+
+```{r}
+
+
+```
+
+
+```{r}
+# create day of week and data frame
+US_accidents$day_of_week <- weekdays(as.Date(US_accidents$Start_Time))
+data.frame(table(US_accidents$day_of_week))
+
+```
+
+Then, we would like to analyze if the accident is happened more often during the rush hours in the weekdays. we first extract the hour of the accident start time and then filtered the data by only weekdays. lastly we plot the histogram of the accident by accident start hour. From the histogram, we can see the accident during the daytime is higher than night time since the cars on the road during the day time is more than night time. Also the accidents happened much more during rush hours especially in the morning which could be a reason for bad traffic in the morning.
+```{r}
+US_accidents$Start_hour <- hour(US_accidents$Start_Time)
+weekday_accident <- filter(US_accidents, day_of_week %in% c("Saturday","Sunday")==FALSE)
+hist(weekday_accident$Start_hour, breaks=seq(0,23,1), xlab = "Accident Start Hour", ylab = "Number of Accidents", main = "Histogram of Accident Start Hour")
+```
+
+We also would like to analyze if the population and geography have impact on the accidents. Our hypotheses is the large city will have more accidents than other cities or towns due to large population. so we first count the accident by each city state and ordered by the number of accident from largest to smallest. As we can see from the results, top 10 city by number of accidents are comparably large cities but not exactly match with top 10 by population. It shows top 3 are all from Texas state.
+```{r}
+# group by 2 col, and count 
+accidentbycity <- data.frame(table(US_accidents$City
+                 , US_accidents$State))
+top_n(accidentbycity[order(accidentbycity$Freq, decreasing = TRUE),],10) 
+```
+
+
+
+How many accidents occurred in day and night time and what was the Severity during that time?
+
+```{r}
+data.frame(table(US_accidents$Severity))
+ggplot(data = US_accidents)+
+  geom_bar(mapping = aes(x = Severity))+
+  facet_wrap(~Sunrise_Sunset)
+```
+The aim of this analysis is to find out and derive accident mostly occurs in the daytime and severity is also higher in compare to night. As per graph we can see most of time severity level 2 and 3 are higher.
+
+
+```{r}
+interval <- interval(strptime(US_accidents$Start_Time, "%Y-%m-%d %H:%M:%S"), strptime(US_accidents$End_Time, "%Y-%m-%d %H:%M:%S"))
+US_accidents$time_in_hours <- time_length(interval, unit = "hour")
+hour_span <- US_accidents %>% group_by(Severity)
+hour_span %>% summarise(
+  hour_span = mean(time_in_hours, na.rm = TRUE),
+)
+```
+
+We would like to find out the weather condition in which most accidents occur. Our hypotheses is that more accidents are likely to happen when the weather condition is bad.
+
+```{r test, output.lines=1:15}
+# Methods used in this research
+# group by col, and count the frequency of number of weather conditions
+WeatherAcc_Count <- data.frame(table(US_accidents$Weather_Condition))
+top_n(WeatherAcc_Count[order(WeatherAcc_Count$Freq, decreasing = TRUE),],10)
+# WeatherAcc_Count[order(WeatherAcc_Count$Freq, decreasing = TRUE),]
+
+```
+We used bar graph to analyze this time zone data. 
+
+```{r}
+ggplot(data = US_accidents) + 
+  geom_bar(mapping = aes(x = Timezone))
+```
+
+## Conclusion 
+After analysis we found that our assumption were correct. Eastern time zone has the highest number of accident on record followed by Pacific standard time zone. This makes sense because these two regions are densely populated leading to more accidents.
+We were surprised to see that most accidents occurred when the weather was either fair or clear. After analyzing we can conclude that people are more attentive while driving when the weather condition is bad and they are less attentive when the weather condition is normal.
+We would like to find out which timezone has the highest accident recorded. Our assumption is that Eastern or Pacific time zone will have the highest number of accidents.
+We were able to find most of the research questions. But we would like to explore more in details about the dataset in part 2 of the project.
+We like how the knitting the R markdown file makes the whole project and data output look much nicer and easier to understand. We had to do some data cleaning and modeling to make our dataset usable. 
