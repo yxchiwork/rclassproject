@@ -1,0 +1,193 @@
+---
+title: "RStudio Sparklyr: Class 3"
+author: "Biagio Palese"
+date: "`r format(Sys.time(), '%d %B, %Y')`" 
+output: 
+  html_document:
+    
+    theme: flatly
+    toc: TRUE
+    toc_float: TRUE
+    code_download: TRUE
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, cache = F}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  error = TRUE,
+  warning= FALSE,
+  message= FALSE)
+```
+## RStudio Sparklyr Class 3: The sparklyr competition
+
+Class Layout: 
+
+
+- Review major concepts from previous classes - at most 20 minutes
+
+- Breakout room (project level groups)--> group competition (explained later but highest score in points wins- time of submission is the tie breaker) - I will rotate among groups after phase 1 is completed for questions and support.
+      - 4 phases to be completed by all groups members (intermediate results submitted via Word at a group level; final results submitted as an rmd in the competition folder by all of you by the end of class; if you don't complete all tasks you can keep working on them after class)
+      
+- Presentation of the winning team & questions for me - All the groups will be back in the main classroom at 8:45pm
+
+
+## Review
+
+In a data analysis project, the main goal is to understand what the data is trying to “tell us”, hoping that it provides an answer to a specific question (e.g., research question, problem statement). Most data analytic projects follow a set of steps:
+      *1) Import*
+      *2) Understand (wrangle<->visualize<->model)*
+      *3) Communicate*
+
+![Figure 1] (https://therinspark.com/the-r-in-spark_files/figure-html/analysis-steps-1.png)<img src="https://therinspark.com/the-r-in-spark_files/figure-html/analysis-steps-1.png"> 
+
+![Figure 1 Analysis Model Steps](class2_sparklyr/analysis-steps.png)
+
+Sparklyr makes available to you a useful approach that allows you to leverage spark and R strengths when dealing with large datasets. The approach is so called **push compute--> collect results**. The idea here is to delegate to Spark all the resource intensive activities (e.g., aggregations, modeling) and then bring only the results back in R because more tools are available to you (e.g., visualizations with ggplot2). 
+
+- Quick review of Class 1 and Class 2 important sections
+
+# Competition details: 
+
+- We will work on a dataset we all know very well (flights). The dataset includes 3 years NYC flights data and the same columns of the one used during the semester. For simplification, the dataset is already tidy and it doesn't contain any NA.  You can work directly in this RMarkdown file.
+
+- The competition consists in 4 phases. All the groups members need to complete the tasks included in each phase. At the end of each phase copy and paste the code used to complete the phase in the Word activities file for this class. Of course you can review and use previous classes materials. Moreover, you can leave empty those tasks that you don't know how to complete (don't get stuck more than 20 minutes on 1 task) and move forward to next ones (excluded phase 1- all of them must be completed). All tasks are worth 1 point to simplify the winner identification.
+
+- You can take breaks whenever you need but I expect all groups to arrive at phase 4 and complete/attempt to complete at least one task in that phase. I will rotate among groups to offer support and see how you guys are working as a group. At 8:45pm I will close the breakout rooms, and announce the winner group. The winner group members will present their work or whatever they believe is valuable to share with the rest of the class (5-10 minutes at most). I will then take any questions you might still have at that point. Good luck, have fun and learn by doing!
+
+## Phase 1: Check requirements/create connection/load data -(15 minutes)--> Submit the code of the below instructions in the Word document on MS Teams
+```{r, total 7 points}
+#1.1) load required packages (tidyverse, sparklyr, dbplot, corrr)
+packages <- c("pacman", "scales")
+install.packages(setdiff(packages, rownames(installed.packages())))  
+pacman::p_load(tidyverse, sparklyr, dbplot, corrr,scales)
+#1.2) check installed java version 
+system("java -version")
+#1.3) check installed spark version
+spark_installed_versions()
+#1.4) create spark connection. Make sure to name the connection sc  
+sc <- spark_connect(master = "local")
+#1.5) load the "flights_challenge_OMIS665.csv" data in RStudio use read_csv. Assign the dataset to an object called flights
+flights <- read_csv("flights_challenge_OMIS665.csv")
+#1.6) load the same data in Spark. Use copy_to or spark_read_csv. Assign the dataset to an object called flights_spark
+spark_read_csv(sc,"flights_spark","flights_challenge_OMIS665.csv")
+
+# 1.7) monitor and analyze execution through Spark’s web interface. Remember to keep an eye on it during the entire duration of the challenge.
+
+```
+
+For the next phases try to always to use pipes (%>%). Moreover, keep always in mind the **push compute--> collect results ** approach if needed.
+
+## Phase 2: Wrangling/Manipulate (all code needs to run in Spark unless specified) --> Submit the code of the below instructions in the Word document on MS Teams. 
+```{r, total points 10}
+#2.1 produce in spark a count of flights available in the dataset 
+flights_spark %>% 
+  count()
+#2.2 compute the average departure delay, arrival delay and distance. 
+flights_spark %>% 
+  summarise("Average Depart Delay"=mean(dep_delay),"Average Arrival Delay"= mean(arr_delay),"Average Distance" =mean(distance))
+#2.3 compute average, min, max and standard deviation for the arrival delay variable for each destination. Make sure to show all the destination and variables in your output (hint: change print options)
+flights_spark %>%
+  group_by(dest) %>% 
+  summarise("Average Arrival Delay" = mean(arr_delay,na.rm = TRUE),"Min Arrival Delay" = min(arr_delay,na.rm = TRUE),"Max Arrival Delay" = max(arr_delay,na.rm = TRUE),"Standard Deviation of Arrival Delay" = sd(arr_delay))
+#2.4 compute average, min, max and standard deviation of the departure delay variable for each carrier.
+flights_spark %>%
+  group_by(carrier) %>% 
+  summarise("Average Departure Delay" = mean(dep_delay,na.rm = TRUE),"Min Departure Delay" = min(dep_delay,na.rm = TRUE),"Max Departure Delay" = max(dep_delay,na.rm = TRUE),"Standard Deviation of Departure Delay" = sd(dep_delay))
+#2.5 modify the flights_spark dataset to include only the flights with origin JFK and departure delay bigger or equal 30 minutes. Sort your data by the highest departure delay
+flights_spark_JFK <- flights_spark %>% 
+  filter(origin == "JFK" && dep_delay >= 30) %>% 
+  arrange(desc(dep_delay))
+#2.6 modify the flights_spark dataset to create a new variable called on_flight_gain. This variable is to arrival delay - departure delay. Make sure to keep only the new variable.
+  flights_spark_gain <- flights_spark %>% 
+    transmute(on_flight_gain = arr_delay - dep_delay)
+#2.7 Per each tailnum, create a new variable called on_flight_loss. This variable is equal to departure delay-arrival delay. Make sure to show all the variables of the flights_spark dataset including the new one (hint: change print options).
+# *Run options(dplyr.width = Inf) before running the below code*
+  flights_spark %>% 
+  group_by(tailnum) %>% 
+  mutate(on_flight_loss = dep_delay - arr_delay) 
+#2.8 per each destination, sort the flights_spark dataset from the largest to the smallest distance
+  flights_spark %>% 
+  group_by(dest) %>% 
+  arrange(desc(distance))
+#2.9 keep in the flights_spark dataset only the following variables: destination, arrival delay, departure delay, distance. Make sure they are displayed in the above specified order.
+  flight_spark_2_9 <- flights_spark %>% 
+    select(dest,arr_delay,dep_delay,distance)
+#2.10 manipulate the flights_spark dataset so that only the following columns are included: carrier, arrival delay, departure delay, distance. Report the min and max of the departure delay variable per each carrier. Make sure to also report the number of flights for each carrier. Make sure to report only the carrier with more than 10000 flights. Compute a new variable named delay_diff that is equal to max departure delay minus min departure delay. Make sure to sort your dataframe according to the delay_diff variable in decreasing order. 
+flights_spark %>% 
+  select(carrier,arr_delay,dep_delay,distance) %>% 
+  group_by(carrier) %>% 
+  filter(count()>10000) %>% 
+  summarise(min_dep_delay = min(dep_delay),max_dep_delay = max(dep_delay),'Number of Flights'=count()) %>% 
+  mutate(delay_diff = min_dep_delay - max_dep_delay) %>% 
+  arrange(desc(delay_diff))
+```
+
+
+## Phase 3: Visualize (all code needs to run in Spark unless specified) --> Submit the code of the below instructions in the Word document on MS Teams. 
+```{r, total 10 points}
+#3.1 create a new dataset named flights_dest. To successfully create this dataset start from the flights_spark dataset, then per each destination compute the sum of the distance of all the flights. Call the sum of the distances as flight_dist. Finally make sure to collect the results back in R and print the new dataset.
+flights_dest <- flights_spark %>% 
+  group_by(dest) %>% 
+  summarise(flight_dist = sum(distance)) %>% 
+  collect() %>% 
+  print()
+#3.2 use geom_col from ggplot2 to visualize the flights_dest dataset. More specifically make sure to display only the destination with a total distance between 50000 and 100000 miles (hint only 5 destinations meet these criteria). Color the bar in red and display destination on the X axis and flight_dist on the Y axis.
+library(ggplot2)
+flights_dest %>% 
+  filter(flight_dist >= 50000, flight_dist <100000) %>% 
+  ggplot() +
+  geom_col(mapping = aes(x = dest, y= flight_dist), fill = "red")
+#3.3 re-create the above plot directly in spark using the flights_spark dataset and dbplot (hint use filter and dbplot_bar functions).  Do not worry about bar colors or axes name. 
+flights_dest %>% 
+  group_by(dest) %>% 
+  filter(flight_dist >= 50000, flight_dist <100000) %>% 
+  dbplot_bar(dest,"Distance" = flight_dist)
+#3.4 create a new dataset named flights_airlines. To successfully create this dataset start from the flights_spark dataset, then per each carrier compute the sum and average of the departure delays of all the flights. Call the sum of the delays as total_delay and the average of the delays as avg_delay. Finally make sure to collect the results back in R and show your dataset.
+flights_airlines <- flights_spark %>% 
+  group_by(carrier) %>% 
+  summarise(total_delay = sum(dep_delay),avg_delay = mean(dep_delay)) %>% 
+  collect() %>% 
+  print()
+
+#3.5 use ggplot2 to visualize the flights_airlines dataset. More specifically make sure to display the carrier on the X axis and the total delay on the Y axis. Moreover, use geom_point and assign a different size to the points based on the avg_delay and a different color based on the carrier. Finally, fix the axis scales (hint: use pretty_breaks function in the scales package) and flip the axis for best visualization output.
+library(scales)#install the package if you haven't done it yet
+#flights_airlines %>% 
+
+ggplot(flights_airlines,aes(total_delay,carrier)) +
+  geom_point(aes(size = "avg_delay",color = "carrier")) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  coord_flip()
+#3.6 use ggplot2 to visualize the flights_airlines dataset. More specifically make sure to display the average delay on the X axis and total_delay on the Y axis. Make sure to use geom_col to also fill and change the color of the bars based on the carrier variable. Finally, make sure to create mini plots for each of the carrier (hint: faceting is needed). Adjust the axis scale as in the previous chart.
+
+#3.7 create a raster plot between arrival delay and distance. Make sure to display the distance on the Y axis and the arrival delay on the X axis. Set the resolution argument to 16.
+
+#3.8 create a raster plot between air time and flight_gain. The flight_gain variable is equal to arrival delay- departure delay. Include only the flights with destination O'Hare (ORD). Make sure to display the air_time on the Y axis and the flight_gain on the X axis.
+
+#3.9 create a raster plot between arrival delay and speed. The speed variable is equal to distance/air time*60. Include only the flights operated by american airlines (AA). Make sure to display the speed on the Y axis and the arrival delay on the X axis.
+
+#3.10 create a line plot that shows how the flights average departure delay changes when flights air time changes (hint: look for dbplot_line). 
+
+```
+
+
+## Phase 4: Final touches  --> Submit the code of the below instructions (when possible) in the Word document on MS Teams
+```{r, total 3 points}
+#4.1 check the correlation among the following variables in the flights_spark dataset: arrival delay, departure delay, air time and distance. Use pairwise pearson correlation. (hint use corrr package)
+
+#4.2 visualize the above correlation matrix. Make sure the correlation points are not replicated
+
+#4.3 run multiple regression directly in spark using the above variable and the following code. It should take no more than a few minutes. (not for points):
+flights_spark %>% 
+  ml_linear_regression(arr_delay ~ .) %>%
+    summary()
+
+#4.4 create a new variable and save the results in cache.  Assign the code to a new dataset, called as cached_flights. The new variable to compute is again the flight_gain variable (see instructions above). Once again make sure to cache this dataset. Then use this new dataset and run again the above multiple regression model with arrival delay as dependent variable. What do you notice? (hint: pay attention to time of execution and R-Squared)
+
+#4.5 close sc connection (not for points but required anytime you are done working with spark)
+spark_disconnect_all()
+#4.6 if time allows, set up RMarkdown with personal descriptions & comments on code and outputs--> exercise your story telling skills. This RMarkdown file should knit to html without problem, even after you have completed the entire competition, just be patient as it will take longer than usual (not for points)
+
+
+```
