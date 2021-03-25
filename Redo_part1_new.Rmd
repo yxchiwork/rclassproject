@@ -1,0 +1,335 @@
+
+---
+title: "Redo_part1_new"
+output:
+  html_document:
+    toc: true
+---
+
+
+```{r}
+---
+title: "Accident Prevention Analytics Consultant Group - Part 1"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  word_document:
+    toc: yes
+  html_document:
+    authors: "Yuxiang Chi, Raj Kumar, Chandrark Thaker, Richa Patel"
+    theme: flatly
+    toc: yes
+    toc_float: yes
+    code_download: yes
+editor_options:
+  chunk_output_type: inline
+---
+```{r setup, include=FALSE, cache = F}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  error = TRUE,
+  warning= FALSE,
+  message= FALSE)
+```
+```
+
+
+```{r}
+# load libraries(prerequistes)
+packages <- c("pacman")
+install.packages(setdiff(packages, rownames(installed.packages()))) 
+pacman::p_load(tidyverse, lubridate, dplyr,scales,ggplot2)
+
+# Import data
+US_accidents <- read_csv("data/US_accidents.csv", 
+    col_types = cols(Start_Time = col_datetime(format = "%m/%d/%Y %H:%M"), 
+        End_Time = col_datetime(format = "%m/%d/%Y %H:%M"), 
+        Weather_Timestamp = col_datetime(format = "%m/%d/%Y %H:%M")))
+```
+
+
+# Introduction
+
+## Group Information
+Group Name: "Accident Prevention Analytics Consultant Group"
+
+### Group Members:
+* Yuxiang Chi
+* Chandrark Thaker
+* Raj Kumar
+* Richa Patel
+
+
+## Dataset description
+This is a countrywide car accident dataset, which covers 49 states of the USA. The accident data are collected from February 2016 to Dec 2020, there are about 4.2 million accident records in this dataset.
+We are using this dataset to analyze the accidents happened in US and what factors are impacting it.
+
+## Reason For choosing this dataset: 
+As we know number of accidents and accident prevention analysis can make changes in real life and it can be useful for people and government administration to make changes in day to day life so that they can prevent possible accidents. Human life are very much important, and because of certain reason they loose their life or because of sever accidents they got injured badly. This dataset can be helpful to prevent accidents and help to find key reasons behind the majority of accidents, and help to make necessary changes. 
+
+
+## Column description
+| Column Name    | Description |
+| ----------- | ----------- |
+| ID | Unique IDs |
+| Severity | Shows the severity of the accident |
+| Start_Time | starts a time of the accident in the local time zone. |
+| End_Time	| end time of the accident in local time zone.|
+| Distance | The length of the road extent affected by the accident. |
+| Description | gives the information about the accident.|
+| Street | shows the street name in the address record. |
+| City | shows the city name in the address record. |
+| County	| shows the county name in the address record.
+| State	| shows the state name in the address record. |
+| Zipcode	| shows the zip code in the address record. |
+| Timezone | shows the time zone depending on the accident location (eastern, central, pacific, etc.) |
+| Weather_Timestamp | Shows the time-stamp of the weather observation record (in local time). |
+| Temperature | Shows the temperature (in Fahrenheit). |
+| Wind_Chill | Shows the wind chill (in Fahrenheit). |
+| Humidity  | Shows the humidity (in percentage). |
+| Pressure | Shows the air pressure (in inches). |
+| Visibility | Shows visibility (in miles). |
+| Wind_Direction | Shows wind direction.(sw: south-west, ssw:  south-south-west, wsw: west-south-west, etc.) |
+| Wind_Speed  |Shows wind speed (in miles per hour). |
+| Weather_Condition | Shows the weather condition (rain, snow, thunderstorm, fog, etc.) |
+| Bump  | shows the accident happen location nearby the speed bump.	|
+| Crossing 	|shows the accident happen location nearby the crossing area. |
+| Precipitation | This column is about the precipitation for the raining.|
+| Junction  |shows the accident happen location nearby the junction. |	
+| No_Exit	|shows the accident happen location nearby the highway exit.	|
+| Traffic_Signal	| shows the accident happen location nearby the traffic signal.	|
+| Sunrise_Sunset  | Shows the period of day (i.e. day or night) based on sunrise/sunset. |
+
+# Data Manupilation
+
+## Columns editing
+In this dataset, the date and time are together in start and end date. We need to seperate them so that we can have individual year, month, day, hour and minute columns. Other than this, columns are self-explainary.
+
+```{r}
+# Removing null records from the dataset and assigned it as accidents, then seperate the date into multiple columns.
+accidents <- US_accidents %>%
+  na.omit(accidents) %>%
+# Separate Start_Time and End_Time
+    separate(Start_Time,into = c("s_year","s_month", "s_date","s_hour","s_minute"))%>%
+      separate(End_Time,into = c("e_year","e_month", "e_date","e_hour","e_minute"))
+```
+
+
+## Data Subset creation
+Here we created smaller subsets of main data for plot usage.
+
+
+## The relationship between severity and distance affected during Day and Night:
+We'd love to analysis whether the higher severity the longer the distance affected would be. Also We want to check whether day time or night time has different impact on them.
+We have plot that data in to scatter plot we used ggplot and geom point, and put Severity on the X axis and Distance on the Y axis. We set legend by Sunrise_Sunset.Also, utilized labs functions to give titles to axis and graph.
+
+```{r}
+# Creating another table for severity and distance relationship analysis.
+sd <- accidents %>%
+  select(Severity, Distance,Sunrise_Sunset) 
+```
+
+
+```{r}
+# Create a plot showing the relationship between severity and distance during Day and Night.
+ggplot(data= sd) +
+  geom_point(mapping = aes(x= Severity, y= Distance, size = 10, color = Sunrise_Sunset, alpha = 0.5))+
+  labs(x= "Severity",
+       y= "Distance",
+       title= "Severity v/s Distance in Day or Night time")
+```
+
+## Conclusion of Severity and Distance Analysis: 
+From the analysis, we can state that most of the sever accidents take place in the day time and Severity 3 has highest distance affected. We can see that severity has a relation with distance less severity has affected the less distance and severity 3 and 4 has minimal difference with distance. some of the accidents in severity 3 has high affected distance. 
+
+## Top 10 Weather conditions impact on accidents analysis:
+The chart below shows the top 10 weather conditions when accidents happened.
+We have used group by and summarise function to count accidetns in each weather condition and selected top 10 weather conditions using the functions arrange descending,top_n. 
+To plot this data we have used ggplot and bar graph. To give title we have used labs function.
+
+```{r}
+count_weather <- accidents %>%
+  select(s_year, Sunrise_Sunset, Weather_Condition)%>%
+  group_by(Weather_Condition) %>%
+  summarise(count=n()) %>%
+  arrange(desc(count)) %>%
+  top_n(10)
+```
+
+
+```{r}
+# Use ggplot column geom to show a bar chart for analysis result.
+ggplot(data = count_weather)+
+  geom_col(mapping = aes(x= Weather_Condition, y= count),fill = "#0017ff")+
+  labs(x= "Top 10 weather conditions",
+       y= "Count of accidents",
+       title= "Number of accidents in weather conditions")
+```
+
+## Conclusion For Weather Analysis: 
+
+As per the conducted analysis visuals we can say that weather condition is not the variable for accidents. majority of the accidents takes place in the fair weather condition. We think that because of sever weather conditions like snowfall of freezing rain most of the accidents take place. But, after conducting this analysis we can say that the weather conditions are not reason behind number of accidents.
+
+## Day and night time impact on accidents
+We use bar chart to show the count of accidents in day and night time, then we use scales to format numbers on y axis. 
+Select method was used to limit the data size for the chart, this chart is assigned to a variable for later use.
+
+```{r}
+accidents %>%
+  select(Sunrise_Sunset) %>%
+  ggplot()+
+  geom_bar(mapping = aes(x= Sunrise_Sunset))+
+  labs(x= "Day or Night time of Accidents",
+       y= "count of accidents",
+       title= "Which condition has more number of accidents") +
+  scale_y_continuous(labels = comma)
+```
+
+## Monthly view for accidents:
+The chart below shows the monthly count for accidents, divided by Severity. 
+Here we have used bar to plot data of months with count of number of accidents with dividing them in different level of severity. 
+Additionally we have used the labs function to give titles and scale_y_count to adjust scale and fix it.
+
+```{r}
+ggp2 <- accidents %>%
+  select(s_month,Severity) %>%
+  ggplot()+
+  geom_bar(mapping = aes(x= s_month), fill= "brown", alpha = 0.5)+
+  facet_wrap(~Severity) + 
+  labs(x= "Months",
+       y= "count of accidents",
+       title= "Which month has more number of accidents")
+ggp2 +
+  scale_y_continuous(labels = comma)
+```
+
+## Conclusion of Monthly Analsis of Accidents: 
+
+From this analysis, we can see that most of accidents  occur in the month of December. We can assume that most of the holidays and long festivals comes in the month of December and people travels more during this time. That can be a reason of high number of accidents in that month. 
+
+## Severity Analysis in Day/Night: 
+In this analysis, we plot the data of Severity and Day/ Night in the Visualization of bar graph using ggplot and geom bar. Using facet wrap we divided graph in to two parts and to visualize severity in day and night. Also, labs function is used to give appropriate title to each axis and to the graph. We have used scale_y_continuous to fix the Y axis.
+
+```{r}
+ggp2 <- accidents %>%
+  select(Sunrise_Sunset,Severity) %>%
+  ggplot()+
+  geom_bar(mapping = aes(x = Severity))+
+  facet_wrap(~Sunrise_Sunset)+ 
+  labs(x= "Severity in Day and Night",
+       y= "Number of Accidents",
+       title = "Severity by Day and Night")
+
+ggp2 + 
+  scale_y_continuous(labels= comma)
+```
+
+## Conclusion of Severity Analysis in Day/Night: 
+
+From this analysis, We can state that most of the accidents occurs in the day time rather than in the nigh time. In the further analysis we will state in which time period or hours most of the accidents happens. Day/Night is an important variable for analysis of accidents. We know we have many reasons to support accidents in night but from the data we can see that high severity accidents happened in the day light. 
+
+## Top 10 Highway Analysis: 
+
+In this analysis to found top 10 highway/Street which has maxmimum count of accidents. In this analysis, we used select function to select street, city and state. Used group by to count accidents by street. Additionally used summarise to count number of accidents and arrange descending to get maximum accidents, and top_n to get only top 10 results. After getting the appropriate data for the visualization, we plot the data using ggplot and grom bar graph to visulise top 10 highways. Utilized labs function to give title to axis and title to graph.
+
+```{r}
+ # Top 10 Streets which has highest accident counts. 
+top_accidents_bystreet <- accidents %>%
+  select(Street, City, State) %>% 
+  group_by(Street) %>%
+  summarise(count =n()) %>%
+  arrange(desc(count)) %>%
+  top_n(10)
+```
+
+
+```{r}
+  # Visualization for top 10 Streets. 
+ ggplot(data = top_accidents_bystreet)+
+  geom_col(mapping = aes(x= Street, y= count,size = 20))+
+  labs(x= "Name of Street",
+       y= "Number of Accidents",
+       title = "Top 10 Streets by accidents in USA")
+```
+
+## Conclusion of Top 10 Highways:
+
+After conducting this analysis, we can state that I- 95 S has maximum number of accidents. In the top 3 highways which has high number of accidents in compare to other highways I-95 S, I- 95 N, I- 10 W. These highways has to prevent accidents and make changes in the highway designs, if maximum number of accidents occurs at the same spot or in the same area. They need to consult with the highway designer regarding how they can prevent accidents on their highways. Highway authorities has to keep the sign board of "accident Prone Zones" or "High Accident Zone" so people give extra attention to this zones.
+
+## Top 10 States Analysis:
+
+Here we have assigned top 10 states by count of accidents, for this analysis we have used group by function to count accidents by each state and to count accidents. We have used summarize and count function. Also we used arrange descending function because we only need top 10 states by count accidents. Additionally we have used top_n function to get top 10 states. Here in this analysis, our aim is to find top 10 states which has maximum accidents count.For that we used scatter plot to visualize the current analysis, and used labs to give appropriate names of the axis and title to the graph. Used size to adjust the size of point and color set to blue and used alpha to adjust opacity of the each point.
+
+```{r}
+top_state <- accidents %>%
+  group_by(State) %>%
+  summarise(count =n()) %>%
+  top_n(10) %>%
+  arrange(desc(count))
+```
+
+
+```{r}
+ggplot(data =  top_state,aes(State,count))+
+    geom_point( colour= "blue", size = 10, alpha =0.5)+
+      labs(x= "Name of State",
+       y= "Number of Accidents",
+       title = "Top 10 States by accidents in USA")
+```
+
+## Conclusion of Top 10 State Analysis:
+
+After conducting this analysis, we can say that in California state government needs to work and take some serious actions for the prevent number of accidents.If we see top 3 states which need to work most on their highways and need to conduct workshop to increase people's awareness on the accidents and driving. California, South Carolina, Texas and Florida has more than 400k accidents. This 4 states need to work more on the highway management and accident prevention. 
+
+## Visibility Analysis:
+
+For this visualization we have used ggplot visualization and developed scatter plot to line graph to locate Visibility and number of accidents at each visibility level. In the beginning of the code we assigned data to ggp4 to manage the scale. Further, we used group by and summarize to count number of accidents at each level of visibility. Moving ahead with the visualization, used size and color to modify the graph. Using labs function, we have assigned the title for each axis and the title for the graph. scale_y_continuous to adjust and fix the axis Y.
+
+```{r}
+ggp4 <- accidents %>%
+  select(Visibility) %>% 
+  filter(Visibility<=10)%>%
+    group_by(Visibility)%>%
+  summarise(count=n())%>%
+  ggplot(aes(Visibility,count))+
+  geom_point(size=3, colour= "red")+
+  geom_line(colour="blue")+
+    labs(x= "Level of Visibility",
+       y= "Number of Accidents",
+       title = "Number of Accidents by Level of Visibility")
+ggp4+ 
+  scale_y_continuous(labels= comma)
+```
+
+## Conclusion of Visibility Analysis: 
+
+After this analysis, we can clearly state that visibility is not the reason the accidents. From the visualization we can see that number of accidents occurred at low visibility level are less and most of accidents occurred during the high-level of visibility. From this we can state that Visibility is not the variable for accidents. From the data we can 400,000 accidents occurred at visibility level of 10.00. 
+
+
+## Amenity Analysis:
+
+We used this code to assign amenity from the accidents_final dataset. we used group by to count accidents for amenities. We used combination of group by and summarize.
+Used count=n() to count number of accidents and assigned this data to amenities.We used ggplot for development of the visualization, we used geom col for developing the bar graph. Added Amenity on the X axis and count of accidents on Y axis.filled with blue color and alpha 0.5 for the opacity of the bar graph. Used the labs to assign names for the each axis and to assign appropriate title to graph. We have used ggp assigned to the visualization to fix the scale in proper manner, And the end of the code used scale_y_continuous to adjust the scale on the Y axis.
+
+```{r}
+amenity<- accidents %>%
+  group_by(Amenity)%>%
+  summarise(count=n())
+```
+
+
+```{r}
+## Visibility of Amenity at the time of Accident. 
+ggp5 <- ggplot(data= amenity, aes(x= Amenity,y=count))+
+  geom_col(fill= "blue", alpha = 0.5)+
+  labs(x= "Availibility of Amenity",
+       y= "Number of Accidents",
+       title = "Presence of Amenity at Time of Accidents")
+ggp5+
+  scale_y_continuous(labels= comma)
+```
+
+## Conclusion of Amenity Analysis: 
+We can clearly see from this analysis, during most of accidents. The amenities were missing during the time of accidents and the place of accidents. It's sad that almost 500,000 accidents doesn't amenities at the time of accidents. 
+
+# Conclusion
+After the study, we learned that accidents happen mostly in fair weather condition day time in December. We also discovered that visibility is not a important factor coming to an accident. Using the plots created, it is easy to analysis the factors to accidents which could be contributed to improvement in the future.
